@@ -213,6 +213,7 @@ class Deconv2DNorm(_LayerNd):
 
 
 def crop_like(input, target):
+    """Crop input hieght and width to match target."""
     if input.size()[2:] == target.size()[2:]:
         return input
     else:

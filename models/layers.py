@@ -53,7 +53,7 @@ class _LayerNd(nn.Module):
 class Conv2DNorm(_LayerNd):
     """Applies 2D convolution over an input signal with batch normalization and activation.
     """
-    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True, kernel_initializer='normal', batch_norm=False, activation=None):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, dilation=1, groups=1, bias=True, kernel_initializer='normal', batch_norm=False, activation=None):
         super(Conv2DNorm, self).__init__(kernel_initializer=kernel_initializer, activation=activation)
 
         conv_base = nn.Conv2d(
@@ -61,7 +61,7 @@ class Conv2DNorm(_LayerNd):
             out_channels=out_channels,
             kernel_size=kernel_size,
             stride=stride,
-            padding=padding,
+            padding=(kernel_size-1)//2,
             dilation=dilation,
             groups=groups,
             bias=bias)
@@ -169,7 +169,7 @@ class ConvResidual2D(Conv2DNorm):
 class Deconv2DNorm(_LayerNd):
     """Applies 2D transposed convolution over an input signal with batch normalization and activation.
     """
-    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, output_padding=0, groups=1, bias=True, kernel_initializer='normal', dilation=1, batch_norm=False, activation=None):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=1, output_padding=0, groups=1, bias=True, kernel_initializer='normal', dilation=1, batch_norm=False, activation=None):
         super(Deconv2DNorm, self).__init__(kernel_initializer=kernel_initializer, activation=activation)
 
         deconv_base = nn.ConvTranspose2d(

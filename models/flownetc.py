@@ -1,48 +1,54 @@
+# Author: Ke Xu
+# Date: Mar 21, 2019
+# License: MIT
+# Reference: https://github.com/ClementPinard/FlowNetPytorch/blob/master/models/FlowNetC.py
 import torch
 import torch.nn as nn
 from torch.nn.init import kaiming_normal_, constant_
-from .util import conv, predict_flow, deconv, crop_like, correlate
+from layers import *
 
 
 class FlowNetC(nn.Module):
     expansion = 1
 
-    def __init__(self, BN=True):
+    def __init__(self, batch_norm=True):
         super(FlowNetC, self).__init__()
 
         self.activation = nn.LeakyReLU(0.1, inplace=True)
 
-        self.conv1 = Conv2DNorm(3, 64, kernel_size=7, stride=2, kernel_initializer='kaiming', batch_norm=batch_norm, activation=self.activ)
-        self.conv2 = Conv2DNorm(64, 128, kernel_size=5, stride=2, kernel_initializer='kaiming', batch_norm=batch_norm, activation=self.activ)
-        self.conv3 = Conv2DNorm(128, 256, kernel_size=5, stride=2, kernel_initializer='kaiming', batch_norm=batch_norm, activation=self.activ)
-        self.conv_redir = Conv2DNorm(256, 32, kernel_size=1, stride=1, kernel_initializer='kaiming', batch_norm=batch_norm, activation=self.activ)
+        self.conv1 = Conv2DNorm(3, 64, kernel_size=7, stride=2, kernel_initializer='kaiming', batch_norm=batch_norm, activation=self.activation)
+        self.conv2 = Conv2DNorm(64, 128, kernel_size=5, stride=2, kernel_initializer='kaiming', batch_norm=batch_norm, activation=self.activation)
+        self.conv3 = Conv2DNorm(128, 256, kernel_size=5, stride=2, kernel_initializer='kaiming', batch_norm=batch_norm, activation=self.activation)
+        self.conv_redir = Conv2DNorm(256, 32, kernel_size=1, stride=1, kernel_initializer='kaiming', batch_norm=batch_norm, activation=self.activation)
 
-        self.conv3_1 = Conv2DNorm(473, 256, kernel_size=3, stride=1, kernel_initializer='kaiming', batch_norm=batch_norm, activation=self.activ)
-        self.conv4   = Conv2DNorm(256, 512, kernel_size=3, stride=2, kernel_initializer='kaiming', batch_norm=batch_norm, activation=self.activ)
-        self.conv4_1 = Conv2DNorm(512, 512, kernel_size=3, stride=1, kernel_initializer='kaiming', batch_norm=batch_norm, activation=self.activ)
-        self.conv5   = Conv2DNorm(512, 512, kernel_size=3, stride=2, kernel_initializer='kaiming', batch_norm=batch_norm, activation=self.activ)
-        self.conv5_1 = Conv2DNorm(512, 512, kernel_size=3, stride=1, kernel_initializer='kaiming', batch_norm=batch_norm, activation=self.activ)
-        self.conv6   = Conv2DNorm(512, 1024, kernel_size=3, stride=2, kernel_initializer='kaiming', batch_norm=batch_norm, activation=self.activ)
-        self.conv6_1 = Conv2DNorm(1024, 1024, kernel_size=3, stride=1, kernel_initializer='kaiming', batch_norm=batch_norm, activation=self.activ)
+        self.conv3_1 = Conv2DNorm(473, 256, kernel_size=3, stride=1, kernel_initializer='kaiming', batch_norm=batch_norm, activation=self.activation)
+        self.conv4   = Conv2DNorm(256, 512, kernel_size=3, stride=2, kernel_initializer='kaiming', batch_norm=batch_norm, activation=self.activation)
+        self.conv4_1 = Conv2DNorm(512, 512, kernel_size=3, stride=1, kernel_initializer='kaiming', batch_norm=batch_norm, activation=self.activation)
+        self.conv5   = Conv2DNorm(512, 512, kernel_size=3, stride=2, kernel_initializer='kaiming', batch_norm=batch_norm, activation=self.activation)
+        self.conv5_1 = Conv2DNorm(512, 512, kernel_size=3, stride=1, kernel_initializer='kaiming', batch_norm=batch_norm, activation=self.activation)
+        self.conv6   = Conv2DNorm(512, 1024, kernel_size=3, stride=2, kernel_initializer='kaiming', batch_norm=batch_norm, activation=self.activation)
+        self.conv6_1 = Conv2DNorm(1024, 1024, kernel_size=3, stride=1, kernel_initializer='kaiming', batch_norm=batch_norm, activation=self.activation)
 
-        self.deconv5 = Deconv2DNorm(1024, 512, kernel_size=4, stride=2, bias=False, kernel_initializer='kaiming', activation=self.activ)
-        self.deconv4 = Deconv2DNorm(1026, 256, kernel_size=4, stride=2, bias=False, kernel_initializer='kaiming', activation=self.activ)
-        self.deconv3 = Deconv2DNorm(770, 128, kernel_size=4, stride=2, bias=False, kernel_initializer='kaiming', activation=self.activ)
-        self.deconv2 = Deconv2DNorm(386, 64, kernel_size=4, stride=2, bias=False, kernel_initializer='kaiming', activation=self.activ)
+        self.deconv5 = Deconv2DNorm(1024, 512, kernel_size=4, stride=2, bias=False, kernel_initializer='kaiming', activation=self.activation)
+        self.deconv4 = Deconv2DNorm(1026, 256, kernel_size=4, stride=2, bias=False, kernel_initializer='kaiming', activation=self.activation)
+        self.deconv3 = Deconv2DNorm(770, 128, kernel_size=4, stride=2, bias=False, kernel_initializer='kaiming', activation=self.activation)
+        self.deconv2 = Deconv2DNorm(386, 64, kernel_size=4, stride=2, bias=False, kernel_initializer='kaiming', activation=self.activation)
 
-        self.predict_flow6 = predict_flow(1024)
-        self.predict_flow5 = predict_flow(1026)
-        self.predict_flow4 = predict_flow(770)
-        self.predict_flow3 = predict_flow(386)
-        self.predict_flow2 = predict_flow(194)
+        self.predict_flow6 = Conv2DNorm(1024, 2, 3, bias=False)
+        self.predict_flow5 = Conv2DNorm(1026, 2, 3, bias=False)
+        self.predict_flow4 = Conv2DNorm(770, 2, 3, bias=False)
+        self.predict_flow3 = Conv2DNorm(386, 2, 3, bias=False)
+        self.predict_flow2 = Conv2DNorm(194, 2, 3, bias=False)
 
         self.upsampled_flow6_to_5 = Deconv2DNorm(2, 2, 4, stride=2, bias=False)
         self.upsampled_flow5_to_4 = Deconv2DNorm(2, 2, 4, stride=2, bias=False)
         self.upsampled_flow4_to_3 = Deconv2DNorm(2, 2, 4, stride=2, bias=False)
         self.upsampled_flow3_to_2 = Deconv2DNorm(2, 2, 4, stride=2, bias=False)
 
+        # kaiming init already taken care in conv layers
+        # constant init for BN layers
         for m in self.modules():
-            elif isinstance(m, nn.BatchNorm2d):
+            if isinstance(m, nn.BatchNorm2d):
                 constant_(m.weight, 1)
                 constant_(m.bias, 0)
 
@@ -101,28 +107,6 @@ class FlowNetC(nn.Module):
     def bias_parameters(self):
         return [param for name, param in self.named_parameters() if 'bias' in name]
 
-
-def flownetc(data=None):
-    """FlowNetS model architecture from the
-    "Learning Optical Flow with Convolutional Networks" paper (https://arxiv.org/abs/1504.06852)
-
-    Args:
-        data : pretrained weights of the network. will create a new one if not set
-    """
-    model = FlowNetC(batchNorm=False)
-    if data is not None:
-        model.load_state_dict(data['state_dict'])
-    return model
-
-
-def flownetc_bn(data=None):
-    """FlowNetS model architecture from the
-    "Learning Optical Flow with Convolutional Networks" paper (https://arxiv.org/abs/1504.06852)
-
-    Args:
-        data : pretrained weights of the network. will create a new one if not set
-    """
-    model = FlowNetC(batchNorm=True)
-    if data is not None:
-        model.load_state_dict(data['state_dict'])
-    return model
+if __name__ == '__main__':
+    net = FlowNetC(batch_norm=True)
+    print(net)

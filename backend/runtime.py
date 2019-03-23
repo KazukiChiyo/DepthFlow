@@ -1,3 +1,7 @@
+# Author: Kexuan Zou
+# Date: Mar 16, 2019
+# License: MIT
+
 import torch
 from tqdm import tqdm
 
@@ -15,8 +19,6 @@ class Train(object):
         The loss criterion.
     device: torch.device
         An object representing the device on which tensors are allocated.
-    metric: function
-        An instance specifying the metric to return.
     """
     def __init__(self, model, data_loader, optim, criterion, device):
         self.model = model
@@ -29,18 +31,21 @@ class Train(object):
         """Run an epoch of training."""
         self.model.train()
         epoch_loss = 0.0
+        epoch_metric = 0.0
+
         for step, batch_data in enumerate(tqdm(self.data_loader), 1):
             inputs = batch_data[0].to(self.device)
             labels = batch_data[1].to(self.device)
             outputs = self.model(inputs)
-            loss = self.criterion(outputs, labels)
+            loss, metric = self.criterion(outputs, labels)
             self.optim.zero_grad()
             loss.backward()
             self.optim.step()
 
             epoch_loss += loss.item()
+            epoch_metric += metric.item()
 
-        return epoch_loss/len(self.data_loader)
+        return epoch_loss/len(self.data_loader), epoch_metric/len(self.data_loader)
 
 
 class Test(object):
@@ -55,8 +60,6 @@ class Test(object):
         The loss criterion.
     device: torch.device
         An object representing the device on which tensors are allocated.
-    metric: function
-        An instance specifying the metric to return.
     """
     def __init__(self, model, data_loader, criterion, device):
         self.model = model
@@ -68,14 +71,17 @@ class Test(object):
         """Run an epoch of validation."""
         self.model.eval()
         epoch_loss = 0.0
+        epoch_metric = 0.0
+
         for step, batch_data in enumerate(tqdm(self.data_loader), 1):
             inputs = batch_data[0].to(self.device)
             labels = batch_data[1].to(self.device)
 
             with torch.no_grad():
                 outputs = self.model(inputs)
-                loss = self.criterion(outputs, labels)
+                loss, metric = self.criterion(outputs, labels)
 
             epoch_loss += loss.item()
+            epoch_metric += metric.item()
 
-        return epoch_loss/len(self.data_loader)
+        return epoch_loss/len(self.data_loader), epoch_metric/len(self.data_loader)

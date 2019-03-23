@@ -43,8 +43,3 @@ def flying_chairs(dPath, transform=None, target_transform=None,
     test_dataset = ListDataset(dPath, test_list, transform, target_transform)
 
     return train_dataset, test_dataset
-
-# for single file testing
-dataPath='/media/peixin/DATA/Research/DataSet/FlyingChairs_release/dataSubset'
-train,test=flying_chairs(dataPath, split=0.9)
-print(train.__getitem__(0))

@@ -108,8 +108,3 @@ def KITTI_noc(dPath, transform=None, target_transform=None,
     test_dataset = ListDataset(dPath, test_list, transform, target_transform, CenterCrop((370,1224)), loader=KITTI_loader)
 
     return train_dataset, test_dataset
-
-# for single file testing
-dataPath='/media/peixin/DATA/Research/DataSet/data_scene_flow/trainingSubset'
-train,test=KITTI_noc(dataPath, split=0.9)
-print(train.__getitem__(0))

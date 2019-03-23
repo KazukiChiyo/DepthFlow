@@ -24,7 +24,7 @@ parser.add_argument('--workers', default=8, type=int,
     help='number of data loading workers')
 parser.add_argument('--n_epoches', default=300, type=int,
     help='number of total epoches')
-parser.add_argument('--batch_size', default=8, type=0,
+parser.add_argument('--batch_size', default=8, type=int,
     help='batch size')
 parser.add_argument('--lr', default=1e-4, type=float,
     help='learning rate')
@@ -46,7 +46,7 @@ parser.add_argument('--weight_decay', default=4e-4, type=float,
     help='weight decay')
 parser.add_argument('--lr_step_size', default=50, type=int,
     help='period of learning rate decay')
-parser.add_arguent('--lr_decay', default=0.1, type=float,
+parser.add_argument('--lr_decay', default=0.1, type=float,
     help='factor of learning rate decay')
 args = parser.parse_args()
 
@@ -67,7 +67,7 @@ if __name__ == '__main__':
     cudnn.benchmark = True
     model = FlowNetS().to(device)
     model_name = 'FlowNetS'
-    criterion = MultiScaleEPE(start_scale=args.start_scale, n_scales=args.n_scales, l_weight=args.l_weight, norm=args.norm, div_flow=args.div_flow)
+    criterion = MultiScaleEPE(start_scale=args.start_scale, n_scales=args.n_scales, l_weight=args.l_weights, norm=args.norm, div_flow=args.div_flow)
     optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(args.alpha, args.beta), weight_decay=args.weight_decay)
     scheduler = lr_scheduler.StepLR(optimizer, step_size=args.lr_step_size, gamma=args.lr_decay)
 

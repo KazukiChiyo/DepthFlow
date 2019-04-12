@@ -5,79 +5,50 @@
 
 import torch
 import torch.nn as nn
-
-def EPE(input_flow, target_flow):
-    return torch.norm(target_flow - input_flow, p=2, dim=1).mean()
-
-class L1(nn.Module):
-    def __init__(self):
-        super(L1, self).__init__()
-
-    def forward(self, output, target):
-        lossvalue = torch.abs(output - target).mean()
-        return lossvalue
+import torch.nn.functional as F
 
 
-class L2(nn.Module):
-    def __init__(self):
-        super(L2, self).__init__()
-
-    def forward(self, output, target):
-        lossvalue = torch.norm(output-target, p=2, dim=1).mean()
-        return lossvalue
-
-
-class L1Loss(nn.Module):
-    def __init__(self):
-        super(L1Loss, self).__init__()
-        self.loss = L1()
-
-    def forward(self, output, target):
-        lossvalue = self.loss(output, target)
-        epevalue = EPE(output, target)
-        return lossvalue, epevalue
+def _EPE(input_flow, target_flow, mean=True):
+    EPE_map = torch.norm(target_flow - input_flow, p=2, dim=1)
+    mask = (target_flow[:,0] == 0) & (target_flow[:,1] == 0)
+    EPE_map = EPE_map[~mask]
+    if mean:
+        return EPE_map.mean()
+    else:
+        return EPE_map.sum()/EPE_map.size(0)
 
 
-class L2Loss(nn.Module):
-    def __init__(self):
-        super(L2Loss, self).__init__()
-        self.loss = L2()
-
-    def forward(self, output, target):
-        lossvalue = self.loss(output, target)
-        epevalue = EPE(output, target)
-        return lossvalue, epevalue
+def sparse_max_pool2d(input, size):
+    positive = (input > 0).float()
+    negative = (input < 0).float()
+    return F.adaptive_max_pool2d(input*positive, size) - F.adaptive_max_pool2d(-input*negative, size)
 
 
 class MultiScaleEPE(nn.Module):
-    def __init__(self, start_scale=4, n_scales=5, l_weight=0.32, norm='L1', div_flow=0.05):
+    def __init__(self, n_scales=5, l_weight=0.32):
         super(MultiScaleEPE, self).__init__()
 
-        self.start_scale = start_scale
         self.n_scales = n_scales
-        self.loss_weights = torch.FloatTensor([(l_weight/2**scale) for scale in range(self.n_scales)])
-        self.norm = norm
-        self.div_flow = div_flow
+        self.loss_weights = [(l_weight/2**scale) for scale in range(self.n_scales)]
 
-        if self.norm == 'L1':
-            self.loss = L1()
-        else:
-            self.loss = L2()
-
-        self.multiscales = [nn.AvgPool2d(self.start_scale*(2**scale), self.start_scale*(2**scale)) for scale in range(self.n_scales)]
+    def one_scale(self, output, target):
+        _, _, h, w = output.size()
+        target_scaled = sparse_max_pool2d(target, (h, w))
+        return _EPE(output, target_scaled, mean=False)
 
     def forward(self, output, target):
-        lossvalue = 0
-        epevalue = 0
+        loss = 0
+        target = target
+        for i, output_ in enumerate(output):
+            loss += self.loss_weights[i]*self.one_scale(output_, target)
+        return loss
 
-        if type(output) is tuple:
-            target = self.div_flow * target
-            for i, output_ in enumerate(output):
-                target_ = self.multiscales[i](target)
-                epevalue += self.loss_weights[i]*EPE(output_, target_)
-                lossvalue += self.loss_weights[i]*self.loss(output_, target_)
-            return lossvalue, epevalue
-        else:
-            epevalue = EPE(output, target)
-            lossvalue = self.loss(output, target)
-            return lossvalue, epevalue
+
+class EPE(nn.Module):
+    def __init__(self, div_flow=0.05):
+        self.div_flow = div_flow
+
+    def __call__(self, output, target):
+        _, _, h, w = output.size()
+        output_scaled = F.interpolate(output, (h,w), mode='bilinear', align_corners=False)
+        return _EPE(output_scaled, target)

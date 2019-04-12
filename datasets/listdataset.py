@@ -1,5 +1,5 @@
 import torch.utils.data as data
-from datasets.util import *
+from .utils import default_loader
 
 class ListDataset(data.Dataset):
     def __init__(self, dPath, path_list, transform=None, target_transform=None,

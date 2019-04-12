@@ -3,6 +3,7 @@
 # License: MIT
 
 import torch
+import torch.nn.functional as F
 from tqdm import tqdm
 
 class Train(object):
@@ -17,27 +18,33 @@ class Train(object):
         Optimization algorithm.
     criterion: torch.nn
         The loss criterion.
+    metric: torch.nn
+        Metric evaluating the output.
     device: torch.device
         An object representing the device on which tensors are allocated.
     """
-    def __init__(self, model, data_loader, optim, criterion, device):
+    def __init__(self, model, data_loader, optim, criterion, metric, device):
         self.model = model
         self.data_loader = data_loader
         self.optim = optim
         self.criterion = criterion
+        self.metric = metric
         self.device = device
 
     def run_epoch(self):
         """Run an epoch of training."""
         self.model.train()
-        epoch_loss = 0.0
-        epoch_metric = 0.0
+        epoch_loss = 0
+        epoch_metric = 0
 
-        for step, batch_data in enumerate(tqdm(self.data_loader), 1):
-            inputs = batch_data[0].to(self.device)
-            labels = batch_data[1].to(self.device)
+        for step, (input, target) in enumerate(tqdm(self.data_loader), 1):
+            inputs = torch.cat(input, 1).to(self.device)
+            target = target.to(self.device)
             outputs = self.model(inputs)
-            loss, metric = self.criterion(outputs, labels)
+            _, _, h, w = target.size()
+            outputs = [F.interpolate(outputs[0], (h, w)), *outputs[1:]]
+            loss = self.criterion(outputs, target)
+            metric = self.metric(outputs[0], target)
             self.optim.zero_grad()
             loss.backward()
             self.optim.step()
@@ -56,32 +63,30 @@ class Test(object):
         Model object to train.
     data_loader: torch.utils.data.DataLoader
         Data loader that iterates over (input, label) pairs.
-    criterion: torch.nn
-        The loss criterion.
+    metric: torch.nn
+        Metric evaluating the output.
     device: torch.device
         An object representing the device on which tensors are allocated.
     """
-    def __init__(self, model, data_loader, criterion, device):
+    def __init__(self, model, data_loader, metric, device):
         self.model = model
         self.data_loader = data_loader
-        self.criterion = criterion
+        self.metric = metric
         self.device = device
 
     def run_epoch(self):
         """Run an epoch of validation."""
         self.model.eval()
-        epoch_loss = 0.0
-        epoch_metric = 0.0
+        epoch_metric = 0
 
-        for step, batch_data in enumerate(tqdm(self.data_loader), 1):
-            inputs = batch_data[0].to(self.device)
-            labels = batch_data[1].to(self.device)
+        for step, (input, target) in enumerate(tqdm(self.data_loader), 1):
+            inputs = torch.cat(input, 1).to(self.device)
+            target = target.to(self.device)
 
             with torch.no_grad():
                 outputs = self.model(inputs)
-                loss, metric = self.criterion(outputs, labels)
+                metric = self.metric(outputs, target)
 
-            epoch_loss += loss.item()
             epoch_metric += metric.item()
 
-        return epoch_loss/len(self.data_loader), epoch_metric/len(self.data_loader)
+        return epoch_metric/len(self.data_loader)

@@ -1,7 +1,7 @@
 import os.path
 import glob
-from datasets.listdataset import ListDataset
-from datasets.util import split2list
+from .listdataset import ListDataset
+from .utils import split2list
 
 
 def make_dataset(dPath, split=None):

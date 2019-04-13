@@ -16,7 +16,7 @@ from tensorboardX import SummaryWriter
 data_dir = './KITTI/training'
 
 def checkpoint(state):
-    model_out_path = "./ckpts/{}_epoch_{}_loss_{:.4f}_epe{:.4f}.pth".format(state['name'], state['epoch'], state['loss'], state['epe'])
+    model_out_path = "./ckpts/{}_epoch_{}_epe{:.4f}_df{:.4f}.pth".format(state['name'], state['epoch'], state['epe'], state['div_flow'])
     torch.save(state, model_out_path)
     print("Checkpoint saved to {}".format(model_out_path))
 
@@ -100,12 +100,12 @@ if __name__ == '__main__':
         train_writer.add_scalar('avg epe', train_epe, epoch)
         if epoch%10 == 0:
             valid_epe = valid.run_epoch()
-            print(">>>> Validation: epe: {.4f}".format(valid_epe))
+            print(">>>> Validation: epe: {:.4f}".format(valid_epe))
             valid_writer.add_scalar('avg epe', valid_epe, epoch)
             checkpoint(state={
                 'name': model_name,
                 'epoch': epoch,
-                'state_dict': model.module.state_dict(),
+                'state_dict': model.state_dict(),
                 'epe': valid_epe,
                 'div_flow': args.div_flow
             })

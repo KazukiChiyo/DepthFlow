@@ -49,6 +49,6 @@ class EPE(nn.Module):
         self.div_flow = div_flow
 
     def __call__(self, output, target):
-        _, _, h, w = output.size()
+        _, _, h, w = target.size()
         output_scaled = F.interpolate(output, (h,w), mode='bilinear', align_corners=False)
         return _EPE(output_scaled, target)

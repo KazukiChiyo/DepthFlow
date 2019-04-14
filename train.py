@@ -23,8 +23,8 @@ def checkpoint(state):
 parser = argparse.ArgumentParser(description='PyTorch Vogel Training')
 parser.add_argument('--workers', default=8, type=int,
     help='number of data loading workers')
-parser.add_argument('--n_epoches', default=300, type=int,
-    help='number of total epoches')
+parser.add_argument('--n_epochs', default=300, type=int,
+    help='number of total epochs')
 parser.add_argument('--batch_size', default=8, type=int,
     help='batch size')
 parser.add_argument('--lr', default=1e-4, type=float,
@@ -92,7 +92,7 @@ if __name__ == '__main__':
     valid = Test(model=model, data_loader=valid_loader, metric=metric, device=device)
     valid_writer = SummaryWriter(log_dir='./logs/valid')
 
-    for epoch in range(1, args.n_epoches + 1):
+    for epoch in range(1, args.n_epochs + 1):
         scheduler.step()
         train_loss, train_epe = train.run_epoch()
         print(">>>> Epoch {}: loss: {:.4f}, epe: {:.4f}".format(epoch, train_loss, train_epe))

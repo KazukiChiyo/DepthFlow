@@ -25,11 +25,11 @@ def sparse_max_pool2d(input, size):
 
 
 class MultiScaleEPE(nn.Module):
-    def __init__(self, n_scales=5, l_weight=0.32):
+    def __init__(self, n_scales=5, l_weight=0.005):
         super(MultiScaleEPE, self).__init__()
 
         self.n_scales = n_scales
-        self.loss_weights = [(l_weight/2**scale) for scale in range(self.n_scales)]
+        self.loss_weights = [l_weight, 2*l_weight, 4*l_weight, 16*l_weight, 64*l_weight]
 
     def one_scale(self, output, target):
         _, _, h, w = output.size()
@@ -38,7 +38,6 @@ class MultiScaleEPE(nn.Module):
 
     def forward(self, output, target):
         loss = 0
-        target = target
         for i, output_ in enumerate(output):
             loss += self.loss_weights[i]*self.one_scale(output_, target)
         return loss
@@ -51,4 +50,4 @@ class EPE(nn.Module):
     def __call__(self, output, target):
         _, _, h, w = target.size()
         output_scaled = F.interpolate(output, (h,w), mode='bilinear', align_corners=False)
-        return _EPE(output_scaled, target)
+        return self.div_flow*_EPE(output_scaled, target, mean=True)

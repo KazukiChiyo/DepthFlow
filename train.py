@@ -16,7 +16,7 @@ from tensorboardX import SummaryWriter
 data_dir = './KITTI/training'
 
 def checkpoint(state):
-    model_out_path = "./ckpts/{}_epoch_{}_epe{:.4f}_df{:.4f}.pth".format(state['name'], state['epoch'], state['epe'], state['div_flow'])
+    model_out_path = "./ckpts/{}:{}_epoch_{}_epe{:.4f}_df{:.4f}.pth".format(state['name'], state['solver'], state['epoch'], state['epe'], state['div_flow'])
     torch.save(state, model_out_path)
     print("Checkpoint saved to {}".format(model_out_path))
 
@@ -118,9 +118,10 @@ if __name__ == '__main__':
             if valid_epe < best_epe:
                 checkpoint(state={
                     'name': model_name,
+                    'solver': args.solver,
                     'epoch': epoch,
                     'state_dict': model.state_dict(),
                     'epe': valid_epe,
-                    'div_flow': args.div_flow
+                    'div_flow': args.div_flow,
                 })
                 best_epe = valid_epe

@@ -36,12 +36,13 @@ class Train(object):
         self.model.train()
         epoch_loss = 0
         epoch_metric = 0
+        count = 0
 
         for step, (input, target) in enumerate(tqdm(self.data_loader), 1):
             inputs = torch.cat(input, 1).to(self.device)
             target = target.to(self.device)
             outputs = self.model(inputs)
-            _, _, h, w = target.size()
+            b, _, h, w = target.size()
             outputs = [F.interpolate(outputs[0], (h, w)), *outputs[1:]]
             loss = self.criterion(outputs, target)
             metric = self.metric(outputs[0], target)
@@ -49,10 +50,11 @@ class Train(object):
             loss.backward()
             self.optim.step()
 
-            epoch_loss += loss.item()
-            epoch_metric += metric.item()
+            epoch_loss += loss.item()*b
+            epoch_metric += metric.item()*b
+            count += b
 
-        return epoch_loss/len(self.data_loader), epoch_metric/len(self.data_loader)
+        return epoch_loss/count, epoch_metric/count
 
 
 class Test(object):
@@ -78,15 +80,18 @@ class Test(object):
         """Run an epoch of validation."""
         self.model.eval()
         epoch_metric = 0
+        count = 0
 
         for step, (input, target) in enumerate(tqdm(self.data_loader), 1):
             inputs = torch.cat(input, 1).to(self.device)
             target = target.to(self.device)
+            b = target.size(0)
 
             with torch.no_grad():
                 outputs = self.model(inputs)
                 metric = self.metric(outputs, target)
 
-            epoch_metric += metric.item()
+            epoch_metric += metric.item()*b
+            count += b
 
-        return epoch_metric/len(self.data_loader)
+        return epoch_metric/count

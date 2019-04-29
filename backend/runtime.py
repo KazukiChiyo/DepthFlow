@@ -30,13 +30,14 @@ class Train(object):
         self.criterion = criterion
         self.metric = metric
         self.device = device
+        self.loss_meter = AverageMeter()
+        self.epe_meter = AverageMeter()
 
     def run_epoch(self):
         """Run an epoch of training."""
         self.model.train()
-        epoch_loss = 0
-        epoch_metric = 0
-        count = 0
+        # epoch_loss = 0
+        # epoch_metric = 0
 
         for step, (input, target) in enumerate(tqdm(self.data_loader), 1):
             inputs = torch.cat(input, 1).to(self.device)
@@ -45,16 +46,19 @@ class Train(object):
             b, _, h, w = target.size()
             outputs = [F.interpolate(outputs[0], (h, w)), *outputs[1:]]
             loss = self.criterion(outputs, target)
-            metric = self.metric(outputs[0], target)
+            self.loss_meter.update(loss.item(), b)
+            epe = self.metric(outputs[0], target)
+            self.epe_meter.update(epe.item(), b)
             self.optim.zero_grad()
             loss.backward()
             self.optim.step()
 
-            epoch_loss += loss.item()*b
-            epoch_metric += metric.item()*b
-            count += b
+            # epoch_loss += loss.item()*b
+            # epoch_metric += metric.item()*b
+            # count += b
 
-        return epoch_loss/count, epoch_metric/count
+        # return epoch_loss/count, epoch_metric/count
+        return self.loss_meter.avg, self.epe_meter.avg
 
 
 class Test(object):
@@ -75,23 +79,46 @@ class Test(object):
         self.data_loader = data_loader
         self.metric = metric
         self.device = device
+        self.epe_meter = AverageMeter()
 
     def run_epoch(self):
         """Run an epoch of validation."""
         self.model.eval()
-        epoch_metric = 0
-        count = 0
+        # epoch_metric = 0
 
         for step, (input, target) in enumerate(tqdm(self.data_loader), 1):
             inputs = torch.cat(input, 1).to(self.device)
             target = target.to(self.device)
-            b = target.size(0)
 
             with torch.no_grad():
-                outputs = self.model(inputs)
-                metric = self.metric(outputs, target)
+                output = self.model(inputs)
+                epe = self.metric(output, target)
+                self.epe_meter.update(epe.item(), target.size(0))
 
-            epoch_metric += metric.item()*b
-            count += b
+        #     epoch_metric += metric.item()*b
+        #     count += b
+        #
+        # return epoch_metric/count
+        return self.epe_meter.avg
 
-        return epoch_metric/count
+
+
+class AverageMeter(object):
+    """Computes and stores the average and current value"""
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count
+
+    def __repr__(self):
+        return '{:.3f} ({:.3f})'.format(self.val, self.avg)

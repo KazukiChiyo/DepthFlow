@@ -9,19 +9,21 @@ import torch.nn.functional as F
 
 
 def _EPE(input_flow, target_flow, mean=True):
-    EPE_map = torch.norm(target_flow - input_flow, p=2, dim=1)
+    EPE_map = torch.norm(target_flow - input_flow, 2, 1)
+    b = EPE_map.size(0)
     mask = (target_flow[:,0] == 0) & (target_flow[:,1] == 0)
     EPE_map = EPE_map[~mask]
     if mean:
         return EPE_map.mean()
     else:
-        return EPE_map.sum()/EPE_map.size(0)
+        return EPE_map.sum()/b
 
 
 def sparse_max_pool2d(input, size):
     positive = (input > 0).float()
     negative = (input < 0).float()
-    return F.adaptive_max_pool2d(input*positive, size) - F.adaptive_max_pool2d(-input*negative, size)
+    output = F.adaptive_max_pool2d(input*positive, size) - F.adaptive_max_pool2d(-input*negative, size)
+    return output
 
 
 class MultiScaleEPE(nn.Module):
@@ -44,7 +46,7 @@ class MultiScaleEPE(nn.Module):
 
 
 class EPE(nn.Module):
-    def __init__(self, div_flow=0.05):
+    def __init__(self, div_flow=20):
         self.div_flow = div_flow
 
     def __call__(self, output, target):

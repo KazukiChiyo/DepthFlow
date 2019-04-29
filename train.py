@@ -12,6 +12,7 @@ from models import FlowNetS
 from backend import Train, Test, MultiScaleEPE, EPE, AdaBound
 from datasets import KITTI_noc, utils
 from tensorboardX import SummaryWriter
+from models.test import flownets_bn
 
 data_dir = './KITTI/training'
 
@@ -31,7 +32,7 @@ parser.add_argument('--n_scales', default=5, type=int,
     help='number of different scales for MultiScaleEPE')
 parser.add_argument('--l_weights', default=0.005, type=float,
     help='initial weight loss for MultiScaleEpe')
-parser.add_argument('--div_flow', default=0.05, type=float,
+parser.add_argument('--div_flow', default=20, type=float,
     help='flow normalizing factor')
 parser.add_argument('--solver', default='adam', choices=['adam','adabound', 'sgd'],
     help='solver algorithm, one of adam, adabound or sgd')
@@ -85,7 +86,7 @@ if __name__ == '__main__':
 
     print('--- Building model ---')
     cudnn.benchmark = True
-    model = FlowNetS().to(device)
+    model = flownets_bn().to(device)
     model_name = 'FlowNetS'
     criterion = MultiScaleEPE(n_scales=args.n_scales, l_weight=args.l_weights)
     metric = EPE(div_flow=args.div_flow)

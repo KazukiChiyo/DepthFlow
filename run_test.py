@@ -17,9 +17,9 @@ model_names = sorted(name for name in models.__dict__
 
 parser = argparse.ArgumentParser(description='PyTorch FlowNet inference on a folder of img pairs',
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument('--data', metavar='DIR', default='/home/peixin/Documents/Vogel/KITTI/trainingSubset/image_2',
+parser.add_argument('--data', metavar='DIR', default='/home/peixin/Documents/Vogel/KITTI/trainingSubset',
                     help='path to images folder, image names must match \'[name]0.[ext]\' and \'[name]1.[ext]\'')
-parser.add_argument('--pretrained', metavar='PTH', help='path to pre-trained model', default='/home/peixin/Documents/Vogel/ckpts/FlowNetS_adabound_epoch_600_epe11.5530_df20.0000.pth')
+parser.add_argument('--pretrained', metavar='PTH', help='path to pre-trained model', default='/home/peixin/Documents/Vogel/ckpts/FlowNetS_depth:adam_epoch_300_epe16.8165_df20.0000.pth')
 parser.add_argument('--output', '-o', metavar='DIR', default='/home/peixin/Documents/Vogel/flow',
                     help='path to output folder. If not set, will be created in data folder')
 
@@ -31,6 +31,7 @@ parser.add_argument('--max_flow', default=None, type=float,
                     help='max flow value. Flow map color is saturated above this value. If not set, will use flow map\'s max value')
 parser.add_argument('--upsampling', '-u', choices=['nearest', 'bilinear'], default='bilinear', help='if not set, will output FlowNet raw input,'
                     'which is 4 times downsampled. If set, will output full resolution flow map, with selected upsampling')
+parser.add_argument('--depth', '-d', type=bool,default=True, help='test with depth information')
 
 
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -75,22 +76,28 @@ def main():
     print('save everything to {}'.format(save_path))
     save_path.makedirs_p()
     # Data loading code
-    
+    img_dir=data_dir / 'image_2'
+    if args.depth:
+        depth_dir=data_dir / 'train_disparity'
 
     img_pairs = []
     for ext in args.img_exts:
-        test_files = data_dir.files('*0.{}'.format(ext))
+        test_files = img_dir.files('*0.{}'.format(ext))
         for file in test_files:
             img_pair = file.parent / (file.namebase[:-1] + '1.{}'.format(ext))
-
-            img_pairs.append([file, img_pair])
+            if args.depth:
+                dep0=depth_dir / (file.namebase[:-1] + '0.{}'.format(ext))
+                dep1=depth_dir / (file.namebase[:-1] + '1.{}'.format(ext))
+                img_pairs.append([file, img_pair, dep0, dep1])
+            else:
+                img_pairs.append([file, img_pair])
 
     print('{} samples found'.format(len(img_pairs)))
     # load pretrained weight and create model
     network_data = torch.load(args.pretrained)
     print("using pre-trained model")
     #model = models.__dict__[network_data['name']](network_data).to(device)
-    model=flownets_bn()
+    model=flownets_bn() #TODO
     model.load_state_dict(network_data['state_dict'])
     model.to(device)
 

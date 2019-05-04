@@ -12,7 +12,8 @@ from models import FlowNetS
 from backend import Train, Test, MultiScaleEPE, EPE, AdaBound
 from datasets import KITTI_noc, utils
 from tensorboardX import SummaryWriter
-from models.test import flownets_bn
+# from models.test import flownets_bn
+from models import FlowNetS
 
 data_dir = './KITTI/training'
 
@@ -46,9 +47,11 @@ parser.add_argument('--final_lr', default=0.1, type=float,
     help='final (SGD) learning rate if AdaBound is used')
 parser.add_argument('--weight_decay', default=4e-4, type=float,
     help='weight decay')
-parser.add_argument('--lr_step_size', default=50, type=int,
-    help='period of learning rate decay')
-parser.add_argument('--lr_decay', default=0.1, type=float,
+parser.add_argument('--bias_decay', default=0, type=float,
+    help='bias decay')
+parser.add_argument('--milestones', default=[100, 150, 200],
+    nargs='*', type=int, help='epochs at which learning rate decays')
+parser.add_argument('--lr_decay', default=0.5, type=float,
     help='factor of learning rate decay')
 args = parser.parse_args()
 
@@ -86,19 +89,22 @@ if __name__ == '__main__':
 
     print('--- Building model ---')
     cudnn.benchmark = True
-    model = flownets_bn().to(device)
+    model = FlowNetS().to(device)
     model_name = 'FlowNetS'
     criterion = MultiScaleEPE(n_scales=args.n_scales, l_weight=args.l_weights)
     metric = EPE(div_flow=args.div_flow)
 
-    if args.solver == 'adam':
-        optimizer = optim.Adam(model.parameters(), lr=args.lr, betas=(args.alpha, args.beta), weight_decay=args.weight_decay)
-    elif args.solver == 'adabound':
-        optimizer = AdaBound(model.parameters(), lr=args.lr, betas=(args.alpha, args.beta), final_lr=args.final_lr, weight_decay=args.weight_decay)
-    elif args.solver == 'sgd':
-        optimizer = optim.SGD(model.parameters(), lr=args.lr, weight_dacay=args.weight_decay)
+    param_groups = [{'params': model.bias_parameters(), 'weight_decay': args.bias_decay},
+        {'params': model.weight_parameters(), 'weight_decay': args.weight_decay}]
 
-    scheduler = lr_scheduler.StepLR(optimizer, step_size=args.lr_step_size, gamma=args.lr_decay)
+    if args.solver == 'adam':
+        optimizer = optim.Adam(param_groups, lr=args.lr, betas=(args.alpha, args.beta))
+    elif args.solver == 'adabound':
+        optimizer = AdaBound(param_groups, lr=args.lr, betas=(args.alpha, args.beta), final_lr=args.final_lr)
+    elif args.solver == 'sgd':
+        optimizer = optim.SGD(param_groups, lr=args.lr, momentum=args.alpha)
+
+    scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=args.milestones, gamma=args.lr_decay)
 
     train = Train(model=model, data_loader=train_loader, optim=optimizer, criterion=criterion, metric=metric, device=device)
     train_writer = SummaryWriter(log_dir='./logs/train')

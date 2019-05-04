@@ -13,34 +13,41 @@ class FlowNetS(nn.Module):
     def __init__(self, in_channels=6, batch_norm=True):
         super(FlowNetS,self).__init__()
 
-        self.activ = nn.LeakyReLU(0.1, inplace=True)
+        self.conv1   = Conv2DNorm(in_channels, 64, 7, stride=2, padding=3, bias=False, kernel_initializer='kaiming', batch_norm=batch_norm, activation=True)
+        self.conv2   = Conv2DNorm(64, 128, 5, stride=2, padding=2, bias=False, kernel_initializer='kaiming', batch_norm=batch_norm, activation=True)
+        self.conv3   = Conv2DNorm(128, 256, 5, stride=2, padding=2, bias=False, kernel_initializer='kaiming', batch_norm=batch_norm, activation=True)
+        self.conv3_1 = Conv2DNorm(256, 256, 3, padding=1, bias=False, kernel_initializer='kaiming', batch_norm=batch_norm, activation=True)
+        self.conv4   = Conv2DNorm(256, 512, 3, stride=2, padding=1, bias=False, kernel_initializer='kaiming', batch_norm=batch_norm, activation=True)
+        self.conv4_1 = Conv2DNorm(512, 512, 3, padding=1, bias=False, kernel_initializer='kaiming', batch_norm=batch_norm, activation=True)
+        self.conv5   = Conv2DNorm(512, 512, 3, stride=2, padding=1, bias=False, kernel_initializer='kaiming', batch_norm=batch_norm, activation=True)
+        self.conv5_1 = Conv2DNorm(512, 512, 3, padding=1, bias=False, kernel_initializer='kaiming', batch_norm=batch_norm, activation=True)
+        self.conv6   = Conv2DNorm(512, 1024, 3, stride=2, padding=1, bias=False, kernel_initializer='kaiming', batch_norm=batch_norm, activation=True)
+        self.conv6_1 = Conv2DNorm(1024, 1024, 3, padding=1, bias=False, kernel_initializer='kaiming', batch_norm=batch_norm, activation=True)
 
-        self.conv1   = Conv2DNorm(in_channels, 64, 7, stride=2, kernel_initializer='kaiming', batch_norm=batch_norm, activation=self.activ)
-        self.conv2   = Conv2DNorm(64, 128, 5, stride=2, kernel_initializer='kaiming', batch_norm=batch_norm, activation=self.activ)
-        self.conv3   = Conv2DNorm(128, 256, 5, stride=2, kernel_initializer='kaiming', batch_norm=batch_norm, activation=self.activ)
-        self.conv3_1 = Conv2DNorm(256, 256, 3, kernel_initializer='kaiming', batch_norm=batch_norm, activation=self.activ)
-        self.conv4   = Conv2DNorm(256, 512, 3, stride=2, kernel_initializer='kaiming', batch_norm=batch_norm, activation=self.activ)
-        self.conv4_1 = Conv2DNorm(512, 512, 3, kernel_initializer='kaiming', batch_norm=batch_norm, activation=self.activ)
-        self.conv5   = Conv2DNorm(512, 512, 3, stride=2, kernel_initializer='kaiming', batch_norm=batch_norm, activation=self.activ)
-        self.conv5_1 = Conv2DNorm(512, 512, 3, kernel_initializer='kaiming', batch_norm=batch_norm, activation=self.activ)
-        self.conv6   = Conv2DNorm(512, 1024, 3, stride=2, kernel_initializer='kaiming', batch_norm=batch_norm, activation=self.activ)
-        self.conv6_1 = Conv2DNorm(1024, 1024, 3, kernel_initializer='kaiming', batch_norm=batch_norm, activation=self.activ)
+        self.deconv5 = Deconv2DNorm(1024, 512, 4, stride=2, padding=1, bias=False, kernel_initializer='kaiming', activation=True)
+        self.deconv4 = Deconv2DNorm(1026, 256, 4, stride=2, padding=1, bias=False, kernel_initializer='kaiming', activation=True)
+        self.deconv3 = Deconv2DNorm(770, 128, 4, stride=2, padding=1, bias=False, kernel_initializer='kaiming', activation=True)
+        self.deconv2 = Deconv2DNorm(386, 64, 4, stride=2, padding=1, bias=False, kernel_initializer='kaiming', activation=True)
 
-        self.deconv5 = Deconv2DNorm(1024, 512, 4, stride=2, bias=False, kernel_initializer='kaiming', activation=self.activ)
-        self.deconv4 = Deconv2DNorm(1026, 256, 4, stride=2, bias=False, kernel_initializer='kaiming', activation=self.activ)
-        self.deconv3 = Deconv2DNorm(770, 128, 4, stride=2, bias=False, kernel_initializer='kaiming', activation=self.activ)
-        self.deconv2 = Deconv2DNorm(386, 64, 4, stride=2, bias=False, kernel_initializer='kaiming', activation=self.activ)
+        self.predict_flow6 = Conv2DNorm(1024, 2, 3, padding=1, bias=False)
+        self.predict_flow5 = Conv2DNorm(1026, 2, 3, padding=1, bias=False)
+        self.predict_flow4 = Conv2DNorm(770, 2, 3, padding=1, bias=False)
+        self.predict_flow3 = Conv2DNorm(386, 2, 3, padding=1, bias=False)
+        self.predict_flow2 = Conv2DNorm(194, 2, 3, padding=1, bias=False)
 
-        self.predict_flow6 = Conv2DNorm(1024, 2, 3, bias=False)
-        self.predict_flow5 = Conv2DNorm(1026, 2, 3, bias=False)
-        self.predict_flow4 = Conv2DNorm(770, 2, 3, bias=False)
-        self.predict_flow3 = Conv2DNorm(386, 2, 3, bias=False)
-        self.predict_flow2 = Conv2DNorm(194, 2, 3, bias=False)
+        self.upsampled_flow6_to_5 = Deconv2DNorm(2, 2, 4, stride=2, padding=1, bias=False)
+        self.upsampled_flow5_to_4 = Deconv2DNorm(2, 2, 4, stride=2, padding=1, bias=False)
+        self.upsampled_flow4_to_3 = Deconv2DNorm(2, 2, 4, stride=2, padding=1, bias=False)
+        self.upsampled_flow3_to_2 = Deconv2DNorm(2, 2, 4, stride=2, padding=1, bias=False)
 
-        self.upsampled_flow6_to_5 = Deconv2DNorm(2, 2, 4, stride=2, bias=False)
-        self.upsampled_flow5_to_4 = Deconv2DNorm(2, 2, 4, stride=2, bias=False)
-        self.upsampled_flow4_to_3 = Deconv2DNorm(2, 2, 4, stride=2, bias=False)
-        self.upsampled_flow3_to_2 = Deconv2DNorm(2, 2, 4, stride=2, bias=False)
+        # for m in self.modules():
+        #     if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
+        #         kaiming_normal_(m.weight, 0.1)
+        #         if m.bias is not None:
+        #             constant_(m.bias, 0)
+        #     elif isinstance(m, nn.BatchNorm2d):
+        #         constant_(m.weight, 1)
+        #         constant_(m.bias, 0)
 
 
     def forward(self, x):
@@ -76,3 +83,9 @@ class FlowNetS(nn.Module):
             return flow2,flow3,flow4,flow5,flow6
         else:
             return flow2
+
+    def weight_parameters(self):
+        return [param for name, param in self.named_parameters() if 'weight' in name]
+
+    def bias_parameters(self):
+        return [param for name, param in self.named_parameters() if 'bias' in name]

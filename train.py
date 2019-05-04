@@ -8,7 +8,7 @@ import torch.backends.cudnn as cudnn
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 from torchvision import transforms
-from models import FlowNetS
+from models.DepthFlowNetS import depthflownets
 from backend import Train, Test, MultiScaleEPE, EPE, AdaBound
 from datasets import KITTI_noc, utils
 from tensorboardX import SummaryWriter
@@ -50,6 +50,8 @@ parser.add_argument('--lr_step_size', default=50, type=int,
     help='period of learning rate decay')
 parser.add_argument('--lr_decay', default=0.1, type=float,
     help='factor of learning rate decay')
+parser.add_argument('--depth', default=True, type=bool,
+    help='true if depth information is needed')
 args = parser.parse_args()
 
 
@@ -65,29 +67,43 @@ if __name__ == '__main__':
 
     print('--- Loading datasets ---')
      # Data loading code
-    input_transform = transforms.Compose([
+    #TODO
+    rgb_transform = transforms.Compose([
         utils.ArrayToTensor(),
         transforms.Normalize(mean=[0,0,0], std=[255,255,255]),
         transforms.Normalize(mean=[0.411,0.432,0.45], std=[1,1,1])
     ])
+
+    # depth transform will be ignored if arg.depth=False
+    depth_transform=transforms.Compose([
+        utils.ArrayToTensor(),
+        transforms.Normalize(mean=[0], std=[255]), #???
+        transforms.Normalize(mean=[0.5], std=[1])
+    ])
+
+
     target_transform = transforms.Compose([
         utils.ArrayToTensor(),
         transforms.Normalize(mean=[0,0],std=[args.div_flow,args.div_flow])
     ])
+
+    # not all utils transform support depth!
     co_transform = utils.Compose([
         utils.RandomCrop((320,448)),
         utils.RandomVerticalFlip(),
         utils.RandomHorizontalFlip()
     ])
 
+
     train_loader, valid_loader = KITTI_noc(dir=data_dir, batch_size=args.batch_size,
-        input_transform=input_transform, target_transform=target_transform, co_transform=co_transform,
-        split=0.9, num_workers=args.workers, pin_memory=pin_memory)
+        rgb_transform=rgb_transform, target_transform=target_transform, co_transform=co_transform,
+                                           depth_transform=depth_transform,
+        split=0.9, num_workers=args.workers, pin_memory=pin_memory,depth=args.depth)
 
     print('--- Building model ---')
     cudnn.benchmark = True
-    model = flownets_bn().to(device)
-    model_name = 'FlowNetS'
+    model = depthflownets().to(device)
+    model_name = 'FlowNetS_depth'
     criterion = MultiScaleEPE(n_scales=args.n_scales, l_weight=args.l_weights)
     metric = EPE(div_flow=args.div_flow)
 

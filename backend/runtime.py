@@ -40,6 +40,7 @@ class Train(object):
         # epoch_metric = 0
 
         for step, (input, target) in enumerate(tqdm(self.data_loader), 1):
+
             inputs = torch.cat(input, 1).to(self.device)
             target = target.to(self.device)
             outputs = self.model(inputs)
@@ -87,6 +88,7 @@ class Test(object):
         # epoch_metric = 0
 
         for step, (input, target) in enumerate(tqdm(self.data_loader), 1):
+
             inputs = torch.cat(input, 1).to(self.device)
             target = target.to(self.device)
 

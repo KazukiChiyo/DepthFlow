@@ -4,6 +4,7 @@
 
 import torch.nn as nn
 import torch.nn.init as init
+from torch.nn.init import kaiming_normal_, constant_
 
 activation_functions = {
     'relu': nn.ReLU,
@@ -50,33 +51,33 @@ class _LayerNd(nn.Module):
             self.kernel_initializer = kernel_initializer
 
 
-class Conv2DNorm(_LayerNd):
+class Conv2DNorm(nn.Module):
     """Applies 2D convolution over an input signal with batch normalization and activation.
     """
-    def __init__(self, in_channels, out_channels, kernel_size, stride=1, dilation=1, groups=1, bias=True, kernel_initializer='normal', batch_norm=False, activation=None):
-        super(Conv2DNorm, self).__init__(kernel_initializer=kernel_initializer, activation=activation)
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, groups=1, bias=True, kernel_initializer='normal', batch_norm=False, activation=None):
+        super(Conv2DNorm, self).__init__()
 
         conv_base = nn.Conv2d(
             in_channels=in_channels,
             out_channels=out_channels,
             kernel_size=kernel_size,
             stride=stride,
-            padding=(kernel_size-1)//2,
+            padding=padding,
             dilation=dilation,
             groups=groups,
             bias=bias)
 
-        if hasattr(self, 'gain'):
-            self.kernel_initializer(conv_base.weight, gain=self.gain)
-        else:
-            self.kernel_initializer(conv_base.weight)
+        # if hasattr(self, 'gain'):
+        #     self.kernel_initializer(conv_base.weight, gain=self.gain)
+        # else:
+        #     self.kernel_initializer(conv_base.weight)
 
         if batch_norm:
             if activation:
                 self.conv = nn.Sequential(
                     conv_base,
                     nn.BatchNorm2d(num_features=out_channels),
-                    self.activation)
+                    nn.LeakyReLU(0.1,inplace=True))
             else:
                 self.conv = nn.Sequential(
                     conv_base,
@@ -85,10 +86,19 @@ class Conv2DNorm(_LayerNd):
             if activation:
                 self.conv = nn.Sequential(
                     conv_base,
-                    self.activation)
+                    nn.LeakyReLU(0.1,inplace=True))
             else:
                 self.conv = nn.Sequential(
                     conv_base)
+
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
+                kaiming_normal_(m.weight, 0.1)
+                if m.bias is not None:
+                    constant_(m.bias, 0)
+            elif isinstance(m, nn.BatchNorm2d):
+                constant_(m.weight, 1)
+                constant_(m.bias, 0)
 
     def forward(self, x):
         x = self.conv(x)
@@ -96,11 +106,11 @@ class Conv2DNorm(_LayerNd):
 
 
 # reference: https://github.com/Cadene/pretrained-models.pytorch/blob/master/pretrainedmodels/models/xception.py
-class SeparableConv2D(_LayerNd):
+class SeparableConv2D(nn.Module):
     """Applies depthwise separable 2D convolution over an input signal with batch normalization and activation.
     """
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, dilation=1, bias=True, kernel_initializer='normal', batch_norm=False, activation=None):
-        super(SeparableConv2D, self).__init__(kernel_initializer=kernel_initializer, activation=activation)
+        super(SeparableConv2D, self).__init__()
 
         conv_depthwise = nn.Conv2d(
             in_channels=in_channels,
@@ -122,11 +132,11 @@ class SeparableConv2D(_LayerNd):
             groups=1,
             bias=bias)
 
-        init.xavier_normal_(conv_depthwise.weight)
-        if hasattr(self, 'gain'):
-            self.kernel_initializer(conv_pointwise.weight, gain=self.gain)
-        else:
-            self.kernel_initializer(conv_pointwise.weight)
+        # init.xavier_normal_(conv_depthwise.weight)
+        # if hasattr(self, 'gain'):
+        #     self.kernel_initializer(conv_pointwise.weight, gain=self.gain)
+        # else:
+        #     self.kernel_initializer(conv_pointwise.weight)
 
         if batch_norm:
             if activation:
@@ -134,7 +144,7 @@ class SeparableConv2D(_LayerNd):
                     conv_depthwise,
                     conv_pointwise,
                     nn.BatchNorm2d(num_features=out_channels),
-                    self.activation)
+                    nn.LeakyReLU(0.1,inplace=True))
             else:
                 self.conv = nn.Sequential(
                     conv_depthwise,
@@ -145,11 +155,20 @@ class SeparableConv2D(_LayerNd):
                 self.conv = nn.Sequential(
                     conv_depthwise,
                     conv_pointwise,
-                    self.activation)
+                    nn.LeakyReLU(0.1,inplace=True))
             else:
                 self.conv = nn.Sequential(
                     conv_depthwise,
                     conv_pointwise)
+
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
+                kaiming_normal_(m.weight, 0.1)
+                if m.bias is not None:
+                    constant_(m.bias, 0)
+            elif isinstance(m, nn.BatchNorm2d):
+                constant_(m.weight, 1)
+                constant_(m.bias, 0)
 
     def forward(self, x):
         x = self.conv(x)
@@ -166,11 +185,11 @@ class ConvResidual2D(Conv2DNorm):
         return x + out
 
 
-class Deconv2DNorm(_LayerNd):
+class Deconv2DNorm(nn.Module):
     """Applies 2D transposed convolution over an input signal with batch normalization and activation.
     """
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=1, output_padding=0, groups=1, bias=True, kernel_initializer='normal', dilation=1, batch_norm=False, activation=None):
-        super(Deconv2DNorm, self).__init__(kernel_initializer=kernel_initializer, activation=activation)
+        super(Deconv2DNorm, self).__init__()
 
         deconv_base = nn.ConvTranspose2d(
             in_channels=in_channels,
@@ -183,17 +202,17 @@ class Deconv2DNorm(_LayerNd):
             bias=bias,
             dilation=dilation)
 
-        if hasattr(self, 'gain'):
-            self.kernel_initializer(deconv_base.weight, gain=self.gain)
-        else:
-            self.kernel_initializer(deconv_base.weight)
+        # if hasattr(self, 'gain'):
+        #     self.kernel_initializer(deconv_base.weight, gain=self.gain)
+        # else:
+        #     self.kernel_initializer(deconv_base.weight)
 
         if batch_norm:
             if activation:
                 self.deconv = nn.Sequential(
                     deconv_base,
                     nn.BatchNorm2d(num_features=out_channels),
-                    self.activation)
+                    nn.LeakyReLU(0.1,inplace=True))
             else:
                 self.deconv = nn.Sequential(
                     deconv_base,
@@ -202,10 +221,19 @@ class Deconv2DNorm(_LayerNd):
             if activation:
                 self.deconv = nn.Sequential(
                     deconv_base,
-                    self.activation)
+                    nn.LeakyReLU(0.1,inplace=True))
             else:
                 self.deconv = nn.Sequential(
                     deconv_base)
+
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
+                kaiming_normal_(m.weight, 0.1)
+                if m.bias is not None:
+                    constant_(m.bias, 0)
+            elif isinstance(m, nn.BatchNorm2d):
+                constant_(m.weight, 1)
+                constant_(m.bias, 0)
 
     def forward(self, x):
         x = self.deconv(x)

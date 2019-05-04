@@ -10,11 +10,16 @@ from .layers import Conv2DNorm, Deconv2DNorm, crop_like
 
 class FlowNetS(nn.Module):
 
-    def __init__(self, in_channels=6, batch_norm=True):
+    def __init__(self, in_channels=6, grouped=False, batch_norm=True):
         super(FlowNetS,self).__init__()
 
-        self.conv1   = Conv2DNorm(in_channels, 64, 7, stride=2, padding=3, bias=False, kernel_initializer='kaiming', batch_norm=batch_norm, activation=True)
-        self.conv2   = Conv2DNorm(64, 128, 5, stride=2, padding=2, bias=False, kernel_initializer='kaiming', batch_norm=batch_norm, activation=True)
+        if grouped:
+            self.conv1   = Conv2DNorm(in_channels, 64, 7, stride=2, padding=3, groups=in_channels, bias=False, kernel_initializer='kaiming', batch_norm=batch_norm, activation=True)
+            self.conv2   = Conv2DNorm(64, 128, 5, stride=2, padding=2, groups=64, bias=False, kernel_initializer='kaiming', batch_norm=batch_norm, activation=True)
+        else:
+            self.conv1   = Conv2DNorm(in_channels, 64, 7, stride=2, padding=3, bias=False, kernel_initializer='kaiming', batch_norm=batch_norm, activation=True)
+            self.conv2   = Conv2DNorm(64, 128, 5, stride=2, padding=2, bias=False, kernel_initializer='kaiming', batch_norm=batch_norm, activation=True)
+
         self.conv3   = Conv2DNorm(128, 256, 5, stride=2, padding=2, bias=False, kernel_initializer='kaiming', batch_norm=batch_norm, activation=True)
         self.conv3_1 = Conv2DNorm(256, 256, 3, padding=1, bias=False, kernel_initializer='kaiming', batch_norm=batch_norm, activation=True)
         self.conv4   = Conv2DNorm(256, 512, 3, stride=2, padding=1, bias=False, kernel_initializer='kaiming', batch_norm=batch_norm, activation=True)

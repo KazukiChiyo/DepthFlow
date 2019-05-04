@@ -107,9 +107,11 @@ if __name__ == '__main__':
     cudnn.benchmark = True
     if args.depth:
         in_channels = 8
+        grouped = True
     else:
         in_channels = 6
-    model = FlowNetS(in_channels=in_channels, batch_norm=True).to(device)
+        grouped = False
+    model = FlowNetS(in_channels=in_channels, grouped=grouped, batch_norm=True).to(device)
     model_name = 'FlowNetS_depth'
     criterion = MultiScaleEPE(n_scales=args.n_scales, l_weight=args.l_weights)
     metric = EPE(div_flow=args.div_flow)
@@ -132,6 +134,7 @@ if __name__ == '__main__':
     valid_writer = SummaryWriter(log_dir='./logs/valid')
     best_epe = 2**32
 
+    print('--- Training ---')
     for epoch in range(1, args.n_epochs + 1):
         scheduler.step()
         train_loss, train_epe = train.run_epoch()

@@ -40,15 +40,6 @@ class FlowNetS(nn.Module):
         self.upsampled_flow4_to_3 = Deconv2DNorm(2, 2, 4, stride=2, padding=1, bias=False)
         self.upsampled_flow3_to_2 = Deconv2DNorm(2, 2, 4, stride=2, padding=1, bias=False)
 
-        # for m in self.modules():
-        #     if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
-        #         kaiming_normal_(m.weight, 0.1)
-        #         if m.bias is not None:
-        #             constant_(m.bias, 0)
-        #     elif isinstance(m, nn.BatchNorm2d):
-        #         constant_(m.weight, 1)
-        #         constant_(m.bias, 0)
-
 
     def forward(self, x):
         out_conv2 = self.conv2(self.conv1(x))
@@ -84,8 +75,10 @@ class FlowNetS(nn.Module):
         else:
             return flow2
 
+
     def weight_parameters(self):
         return [param for name, param in self.named_parameters() if 'weight' in name]
+
 
     def bias_parameters(self):
         return [param for name, param in self.named_parameters() if 'bias' in name]

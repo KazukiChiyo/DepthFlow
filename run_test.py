@@ -2,6 +2,7 @@ import argparse
 from path import Path
 import torch
 import torch.nn.functional as F
+from models.test import flownets_bn
 import models
 from tqdm import tqdm
 
@@ -16,10 +17,10 @@ model_names = sorted(name for name in models.__dict__
 
 parser = argparse.ArgumentParser(description='PyTorch FlowNet inference on a folder of img pairs',
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument('data', metavar='DIR',
+parser.add_argument('--data', metavar='DIR', default='/home/peixin/Documents/Vogel/KITTI/trainingSubset/image_2',
                     help='path to images folder, image names must match \'[name]0.[ext]\' and \'[name]1.[ext]\'')
-parser.add_argument('pretrained', metavar='PTH', help='path to pre-trained model')
-parser.add_argument('--output', '-o', metavar='DIR', default=None,
+parser.add_argument('--pretrained', metavar='PTH', help='path to pre-trained model', default='/home/peixin/Documents/Vogel/ckpts/FlowNetS_adabound_epoch_600_epe11.5530_df20.0000.pth')
+parser.add_argument('--output', '-o', metavar='DIR', default='/home/peixin/Documents/Vogel/flow',
                     help='path to output folder. If not set, will be created in data folder')
 
 parser.add_argument('--div-flow', default=20, type=float,
@@ -28,7 +29,7 @@ parser.add_argument("--img-exts", metavar='EXT', default=['png', 'jpg', 'bmp', '
                     help="images extensions to glob")
 parser.add_argument('--max_flow', default=None, type=float,
                     help='max flow value. Flow map color is saturated above this value. If not set, will use flow map\'s max value')
-parser.add_argument('--upsampling', '-u', choices=['nearest', 'bilinear'], default=None, help='if not set, will output FlowNet raw input,'
+parser.add_argument('--upsampling', '-u', choices=['nearest', 'bilinear'], default='bilinear', help='if not set, will output FlowNet raw input,'
                     'which is 4 times downsampled. If set, will output full resolution flow map, with selected upsampling')
 
 
@@ -78,17 +79,22 @@ def main():
 
     img_pairs = []
     for ext in args.img_exts:
-        test_files = data_dir.files('*1.{}'.format(ext))
+        test_files = data_dir.files('*0.{}'.format(ext))
         for file in test_files:
-            img_pair = file.parent / (file.namebase[:-1] + '2.{}'.format(ext))
-            if img_pair.isfile():
-                img_pairs.append([file, img_pair])
+            img_pair = file.parent / (file.namebase[:-1] + '1.{}'.format(ext))
+
+            img_pairs.append([file, img_pair])
 
     print('{} samples found'.format(len(img_pairs)))
     # load pretrained weight and create model
     network_data = torch.load(args.pretrained)
-    print("using pre-trained model '{}'".format(network_data['arch']))
-    model = models.__dict__[network_data['arch']](network_data).to(device)
+    print("using pre-trained model")
+    #model = models.__dict__[network_data['name']](network_data).to(device)
+    model=flownets_bn()
+    model.load_state_dict(network_data['state_dict'])
+    model.to(device)
+
+
     model.eval()
 
     if 'div_flow' in network_data.keys():

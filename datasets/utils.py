@@ -103,14 +103,26 @@ class CenterCrop(object):
     def __call__(self, inputs, target):
         h1, w1, _ = inputs[0].shape
         h2, w2, _ = inputs[1].shape
+        if len(inputs)>2:
+            h3, w3, _ = inputs[2].shape
+            h4, w4, _ = inputs[3].shape
         th, tw = self.size
         x1 = int(round((w1 - tw) / 2.))
         y1 = int(round((h1 - th) / 2.))
         x2 = int(round((w2 - tw) / 2.))
         y2 = int(round((h2 - th) / 2.))
 
+        if len(inputs) > 2:
+            x3 = int(round((w3 - tw) / 2.))
+            y3 = int(round((h3 - th) / 2.))
+            x4 = int(round((w4 - tw) / 2.))
+            y4 = int(round((h4 - th) / 2.))
+
         inputs[0] = inputs[0][y1: y1 + th, x1: x1 + tw]
         inputs[1] = inputs[1][y2: y2 + th, x2: x2 + tw]
+        if len(inputs) > 2:
+            inputs[2] = inputs[2][y3: y3 + th, x3: x3 + tw]
+            inputs[3] = inputs[3][y4: y4 + th, x4: x4 + tw]
         target = target[y1: y1 + th, x1: x1 + tw]
         return inputs,target
 
@@ -165,8 +177,9 @@ class RandomCrop(object):
 
         x1 = random.randint(0, w - tw)
         y1 = random.randint(0, h - th)
-        inputs[0] = inputs[0][y1: y1 + th,x1: x1 + tw]
-        inputs[1] = inputs[1][y1: y1 + th,x1: x1 + tw]
+        for i in range(len(inputs)):
+            inputs[i]=inputs[i][y1: y1 + th,x1: x1 + tw]
+
         return inputs, target[y1: y1 + th,x1: x1 + tw]
 
 
@@ -176,8 +189,9 @@ class RandomHorizontalFlip(object):
 
     def __call__(self, inputs, target):
         if random.random() < 0.5:
-            inputs[0] = np.copy(np.fliplr(inputs[0]))
-            inputs[1] = np.copy(np.fliplr(inputs[1]))
+            for i in range(len(inputs)):
+                inputs[i] = np.copy(np.fliplr(inputs[i]))
+
             target = np.copy(np.fliplr(target))
             target[:,:,0] *= -1
         return inputs,target
@@ -189,8 +203,9 @@ class RandomVerticalFlip(object):
 
     def __call__(self, inputs, target):
         if random.random() < 0.5:
-            inputs[0] = np.copy(np.flipud(inputs[0]))
-            inputs[1] = np.copy(np.flipud(inputs[1]))
+            for i in range(len(inputs)):
+                inputs[i] = np.copy(np.flipud(inputs[i]))
+
             target = np.copy(np.flipud(target))
             target[:,:,1] *= -1
         return inputs,target

@@ -36,7 +36,7 @@ def load_flow_from_png(png_path):
     return(flo_img)
 
 
-def make_dataset(dPath, split, occ=True):
+def make_dataset(dPath, split, occ=True, depth=True):
     """
     Will search in training folder for folders 'flow_noc' or 'flow_occ'
        and 'image_2' (KITTI 2015)
@@ -45,6 +45,8 @@ def make_dataset(dPath, split, occ=True):
     assert(os.path.isdir(os.path.join(dPath, flow_dir)))
     img_dir = 'image_2'
     assert(os.path.isdir(os.path.join(dPath, img_dir)))
+    depth_dir='train_disparity'
+    assert (os.path.isdir(os.path.join(dPath, depth_dir)))
 
     images = []
     for flow_map in glob.iglob(os.path.join(dPath, flow_dir, '*.png')):
@@ -55,15 +57,30 @@ def make_dataset(dPath, split, occ=True):
         img2 = os.path.join(img_dir, root_filename+'_11.png')
         if not (os.path.isfile(os.path.join(dPath, img1)) or os.path.isfile(os.path.join(dPath, img2))):
             continue
-        images.append([[img1, img2], flow_map])
+
+        if depth:
+            dep1=os.path.join(depth_dir,root_filename+'_10.png')
+            dep2 = os.path.join(depth_dir, root_filename + '_11.png')
+            assert os.path.isfile(os.path.join(dPath, dep1)) is True
+            assert os.path.isfile(os.path.join(dPath, dep2)) is True
+            images.append([[img1, img2, dep1, dep2], flow_map])
+        else:
+            images.append([[img1, img2], flow_map])
 
     return split2list(images, split)
 
 
-def KITTI_loader(root,path_imgs, path_flo):
+def KITTI_loader(root,path_imgs, path_flo, depth): #### repair this function
     imgs = [os.path.join(root,path) for path in path_imgs]
     flo = os.path.join(root,path_flo)
-    return [cv2.imread(img)[:,:,::-1].astype(np.float32) for img in imgs],load_flow_from_png(flo)
+    # load RGB images (375,1242,3)
+    I=[cv2.imread(imgs[0])[:, :, ::-1].astype(np.float32),cv2.imread(imgs[1])[:, :, ::-1].astype(np.float32)]
+
+    if depth: # read depth image as gray scale
+        I.append(np.expand_dims(cv2.imread(imgs[2],0),axis=2))
+        I.append(np.expand_dims(cv2.imread(imgs[3],0),axis=2))
+
+    return I, load_flow_from_png(flo)
 
 
 def KITTI_occ(dir, batch_size, input_transform=None, target_transform=None,
@@ -97,8 +114,8 @@ def KITTI_occ(dir, batch_size, input_transform=None, target_transform=None,
     return train_loader, test_loader
 
 
-def KITTI_noc(dir, batch_size, input_transform=None, target_transform=None,
-              co_transform=None, split=None, num_workers=4, pin_memory=True):
+def KITTI_noc(dir, batch_size, rgb_transform=None, target_transform=None, depth_transform=None,
+              co_transform=None, split=None, num_workers=4, pin_memory=True, depth=True):
     """
 
     :param dir: the path to the data folder, it must point to ./data_scene_flow/training
@@ -106,13 +123,18 @@ def KITTI_noc(dir, batch_size, input_transform=None, target_transform=None,
     :param target_transform:
     :param co_transform:
     :param split: a float indicating train test split. If not provided, 0.9 is assumed
+    :param depth: true if we need to load depth information
     :return: train dataset and test dataset
     """
 
-    train_list, test_list = make_dataset(dir, split, False)
-    train_dataset = ListDataset(dir, train_list, input_transform, target_transform, co_transform, loader=KITTI_loader)
+    train_list, test_list = make_dataset(dir, split, False, depth=depth)
+    train_dataset = ListDataset(dir, train_list, rgb_transform=rgb_transform,
+                                target_transform=target_transform, co_transform=co_transform,
+                                depth_transform=depth_transform,loader=KITTI_loader, depth=depth)
     # All test sample are cropped to lowest possible size of KITTI images
-    test_dataset = ListDataset(dir, test_list, input_transform, target_transform, CenterCrop((370,1224)), loader=KITTI_loader)
+    test_dataset = ListDataset(dir, test_list, rgb_transform=rgb_transform, target_transform=target_transform,
+                               co_transform=CenterCrop((370,1224)),
+                               depth_transform=depth_transform, loader=KITTI_loader, depth=depth)
 
     train_loader = DataLoader(
         train_dataset, batch_size=batch_size,

@@ -2,13 +2,17 @@ import argparse
 from path import Path
 import torch
 import torch.nn.functional as F
-from models.test import flownets_bn
+from models.depthflownets import DepthFlowNetS
+from models import FlowNetS
 import models
 from tqdm import tqdm
 
 import torchvision.transforms as transforms
 from imageio import imread, imwrite
+import cv2
 import numpy as np
+
+from datasets import utils
 
 
 model_names = sorted(name for name in models.__dict__
@@ -19,7 +23,7 @@ parser = argparse.ArgumentParser(description='PyTorch FlowNet inference on a fol
                                  formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--data', metavar='DIR', default='/home/peixin/Documents/Vogel/KITTI/trainingSubset',
                     help='path to images folder, image names must match \'[name]0.[ext]\' and \'[name]1.[ext]\'')
-parser.add_argument('--pretrained', metavar='PTH', help='path to pre-trained model', default='/home/peixin/Documents/Vogel/ckpts/FlowNetS_depth:adam_epoch_300_epe16.8165_df20.0000.pth')
+parser.add_argument('--pretrained', metavar='PTH', help='path to pre-trained model', default='/home/peixin/Documents/Vogel/ckpts/FlowNetS_depth:adam_epoch_500_epe9.6607_df20.0000.pth')
 parser.add_argument('--output', '-o', metavar='DIR', default='/home/peixin/Documents/Vogel/flow',
                     help='path to output folder. If not set, will be created in data folder')
 
@@ -32,6 +36,7 @@ parser.add_argument('--max_flow', default=None, type=float,
 parser.add_argument('--upsampling', '-u', choices=['nearest', 'bilinear'], default='bilinear', help='if not set, will output FlowNet raw input,'
                     'which is 4 times downsampled. If set, will output full resolution flow map, with selected upsampling')
 parser.add_argument('--depth', '-d', type=bool,default=True, help='test with depth information')
+
 
 
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -77,8 +82,6 @@ def main():
     save_path.makedirs_p()
     # Data loading code
     img_dir=data_dir / 'image_2'
-    if args.depth:
-        depth_dir=data_dir / 'train_disparity'
 
     img_pairs = []
     for ext in args.img_exts:
@@ -86,6 +89,7 @@ def main():
         for file in test_files:
             img_pair = file.parent / (file.namebase[:-1] + '1.{}'.format(ext))
             if args.depth:
+                depth_dir = data_dir / 'train_disparity'
                 dep0=depth_dir / (file.namebase[:-1] + '0.{}'.format(ext))
                 dep1=depth_dir / (file.namebase[:-1] + '1.{}'.format(ext))
                 img_pairs.append([file, img_pair, dep0, dep1])
@@ -97,7 +101,13 @@ def main():
     network_data = torch.load(args.pretrained)
     print("using pre-trained model")
     #model = models.__dict__[network_data['name']](network_data).to(device)
-    model=flownets_bn() #TODO
+    if args.depth:
+        numChannels=8
+        isGrouped=True
+    else:
+        numChannels=6
+        isGrouped = False
+    model=FlowNetS(in_channels=numChannels, grouped=isGrouped, batch_norm=True)
     model.load_state_dict(network_data['state_dict'])
     model.to(device)
 
@@ -114,24 +124,47 @@ def main():
         transforms.Normalize(mean=[0.411,0.432,0.45], std=[1,1,1])
     ])
 
-    for (img1_file, img2_file) in tqdm(img_pairs):
-        # apply transformations
-        img1 = input_transform(imread(img1_file))
-        img2 = input_transform(imread(img2_file))
-        input_var = torch.cat([img1, img2]).unsqueeze(0)
-        input_var = input_var.to(device)
-        # compute output
-        output = model(input_var)
-        if args.upsampling is not None:
-            output = F.interpolate(output, size=img1.size()[-2:], mode=args.upsampling, align_corners=False)
-        for suffix, flow_output in zip(['flow', 'inv_flow'], output):
-            filename = save_path/'{}{}'.format(img1_file.namebase[:-1], suffix)
-            rgb_flow = flow2rgb(args.div_flow * flow_output, max_value=args.max_flow)
-            to_save = (rgb_flow * 255).astype(np.uint8).transpose(1,2,0)
-            imwrite(filename + '.png', to_save)
-            # Make the flow map a HxWx2 array as in .flo files
-            to_save = flow_output.cpu().numpy().transpose(1,2,0)
-            np.save(filename + '.npy', to_save)
+    # depth transform will be ignored if arg.depth=False
+    depth_transform = transforms.Compose([
+        utils.ArrayToTensor(),
+        transforms.Normalize(mean=[0], std=[255]),
+        transforms.Normalize(mean=[0.5], std=[1])
+    ])
+
+    if args.depth:
+        for (img1_file, img2_file,dep1,dep2) in tqdm(img_pairs):
+            # apply transformations
+            img1 = input_transform(imread(img1_file))
+            img2 = input_transform(imread(img2_file))
+            depth1=depth_transform(np.expand_dims(cv2.imread(dep1,0),axis=2))
+            depth2=depth_transform(np.expand_dims(cv2.imread(dep2,0),axis=2))
+            input_var = torch.cat((img1, img2, depth1,depth2)).unsqueeze(0)
+            input_var = input_var.to(device)
+            # compute output
+            computeOutput(model,input_var,img1,img1_file)
+    else:
+        for (img1_file, img2_file) in tqdm(img_pairs):
+            # apply transformations
+            img1 = input_transform(imread(img1_file))
+            img2 = input_transform(imread(img2_file))
+            input_var = torch.cat((img1, img2)).unsqueeze(0)
+            input_var = input_var.to(device)
+            # compute output
+            computeOutput(model,input_var,img1,img1_file)
+
+
+def computeOutput(model,input_var,img1,img1_file):
+    output = model(input_var)
+    if args.upsampling is not None:
+        output = F.interpolate(output, size=img1.size()[-2:], mode=args.upsampling, align_corners=False)
+    for suffix, flow_output in zip(['flow', 'inv_flow'], output):
+        filename = save_path / '{}{}'.format(img1_file.namebase[:-1], suffix)
+        rgb_flow = flow2rgb(args.div_flow * flow_output, max_value=args.max_flow)
+        to_save = (rgb_flow * 255).astype(np.uint8).transpose(1, 2, 0)
+        imwrite(filename + '.png', to_save)
+        # Make the flow map a HxWx2 array as in .flo files
+        to_save = flow_output.cpu().numpy().transpose(1, 2, 0)
+        np.save(filename + '.npy', to_save)
 
 
 if __name__ == '__main__':

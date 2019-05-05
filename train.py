@@ -8,7 +8,7 @@ import torch.backends.cudnn as cudnn
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 from torchvision import transforms
-# from models.DepthFlowNetS import depthflownets
+from models.depthflownets import DepthFlowNetS
 from backend import Train, Test, MultiScaleEPE, EPE, AdaBound
 from datasets import KITTI_noc, utils
 from tensorboardX import SummaryWriter
@@ -105,13 +105,14 @@ if __name__ == '__main__':
 
     print('--- Building model ---')
     cudnn.benchmark = True
-    if args.depth:
-        in_channels = 8
-        grouped = True
-    else:
-        in_channels = 6
-        grouped = False
-    model = FlowNetS(in_channels=in_channels, grouped=grouped, batch_norm=True).to(device)
+    # if args.depth:
+    #     in_channels = 8
+    #     grouped = True
+    # else:
+    #     in_channels = 6
+    #     grouped = False
+    # model = FlowNetS(in_channels=in_channels, grouped=grouped, batch_norm=True).to(device)
+    model = DepthFlowNetS().to(device)
     model_name = 'FlowNetS_depth'
     criterion = MultiScaleEPE(n_scales=args.n_scales, l_weight=args.l_weights)
     metric = EPE(div_flow=args.div_flow)
@@ -141,7 +142,7 @@ if __name__ == '__main__':
         print(">>>> Epoch {}: loss: {:.4f}, epe: {:.4f}".format(epoch, train_loss, train_epe))
         train_writer.add_scalar('avg loss', train_loss, epoch)
         train_writer.add_scalar('avg epe', train_epe, epoch)
-        if epoch%5 == 0:
+        if epoch%10 == 0:
             valid_epe = valid.run_epoch()
             print(">>>> Validation: epe: {:.4f}".format(valid_epe))
             valid_writer.add_scalar('avg epe', valid_epe, epoch)

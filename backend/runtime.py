@@ -40,10 +40,12 @@ class Train(object):
         # epoch_metric = 0
 
         for step, (input, target) in enumerate(tqdm(self.data_loader), 1):
-
-            inputs = torch.cat(input, 1).to(self.device)
+            rgb_inputs = torch.cat((input[0], input[1]), 1).to(self.device)
+            depth_inputs = torch.cat((input[2], input[3]), 1).to(self.device)
+            #input = torch.cat(input, 1).to(self.device)
             target = target.to(self.device)
-            outputs = self.model(inputs)
+            outputs = self.model(rgb_inputs, depth_inputs)
+            #outputs = self.model(input)
             b, _, h, w = target.size()
             outputs = [F.interpolate(outputs[0], (h, w)), *outputs[1:]]
             loss = self.criterion(outputs, target)
@@ -88,12 +90,14 @@ class Test(object):
         # epoch_metric = 0
 
         for step, (input, target) in enumerate(tqdm(self.data_loader), 1):
-
-            inputs = torch.cat(input, 1).to(self.device)
+            #input = torch.cat(input, 1).to(self.device)
+            rgb_inputs = torch.cat((input[0], input[1]), 1).to(self.device)
+            depth_inputs = torch.cat((input[2], input[3]), 1).to(self.device)
             target = target.to(self.device)
 
             with torch.no_grad():
-                output = self.model(inputs)
+                output = self.model(rgb_inputs, depth_inputs)
+                #output = self.model(input)
                 epe = self.metric(output, target)
                 self.epe_meter.update(epe.item(), target.size(0))
 

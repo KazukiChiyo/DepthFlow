@@ -3,8 +3,8 @@
 rm -rf logs/
 
 python ./train.py \
-    --workers=8 \
-    --n_epochs=300 \
+    --workers=12 \
+    --n_epochs=500 \
     --batch_size=8 \
     --n_scales=5 \
     --l_weights=0.005 \
@@ -17,4 +17,5 @@ python ./train.py \
     --weight_decay=4e-4 \
     --bias_decay=0 \
     --milestones 100 150 200 \
-    --lr_decay=0.5
+    --lr_decay=0.5 \
+    --depth=True

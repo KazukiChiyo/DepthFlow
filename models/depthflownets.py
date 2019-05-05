@@ -11,7 +11,7 @@ from .layers import Conv2DNorm, Deconv2DNorm, crop_like
 class DepthFlowNetS(nn.Module):
 
     def __init__(self, in_channels=6, depth_channels=2, batch_norm=True):
-        super(FlowNetS,self).__init__()
+        super(DepthFlowNetS,self).__init__()
 
         self.conv1   = Conv2DNorm(in_channels, 64, 7, stride=2, padding=3, bias=False, kernel_initializer='kaiming', batch_norm=batch_norm, activation=True)
         self.depth_conv1 = Conv2DNorm(depth_channels, 64, 7, stride=2, padding=3, bias=False, kernel_initializer='kaiming', batch_norm=batch_norm, activation=True)
